@@ -6,6 +6,7 @@
 #include <Firebase_ESP_Client.h>
 #include <LiquidCrystal_I2C.h>
 #include <MFRC522.h>
+#include <Preferences.h>
 #include <SPI.h>
 #include <WiFi.h>
 #include <Wire.h>
@@ -48,6 +49,15 @@ FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 bool signupOK = false;
+
+// ======================================================
+// WIFI PREFERENCES
+// ======================================================
+Preferences preferences;
+String currentSSID = "";
+String currentPassword = "";
+unsigned long lastWiFiCheck = 0;
+unsigned long lastResetCheck = 0;
 
 // ======================================================
 // RFID UID
@@ -100,15 +110,19 @@ void setup() {
   lcd.print("Connecting WiFi");
   Serial.println("Preparing WiFi...");
 
+  preferences.begin("wifi_creds", false);
+  currentSSID = preferences.getString("ssid", WIFI_SSID);
+  currentPassword = preferences.getString("password", WIFI_PASSWORD);
+
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(true);
   delay(100);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
 
   Serial.print("Connecting to: ");
-  Serial.println(WIFI_SSID);
+  Serial.println(currentSSID);
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFi.begin(currentSSID.c_str(), currentPassword.c_str());
 
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 30) {
@@ -186,8 +200,61 @@ void setup() {
 }
 
 void loop() {
-  if (!rfid.PICC_IsNewCardPresent())
+  if (!rfid.PICC_IsNewCardPresent()) {
+    // Check Firebase for reset flag every 3 seconds
+    if (millis() - lastResetCheck > 3000) {
+      lastResetCheck = millis();
+      if (Firebase.ready() && signupOK) {
+        if (Firebase.RTDB.getBool(&fbdo, "/TROLLEY-1/reset")) {
+          if (fbdo.boolData() == true) {
+            Serial.println("Payment Done! Resetting Trolley...");
+            milkQty = 0; biscuitQty = 0; soapQty = 0;
+            subtotal = 0; gst = 0; grandTotal = 0;
+            Firebase.RTDB.setBool(&fbdo, "/TROLLEY-1/reset", false);
+            updateFirebase();
+            
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Payment Done!");
+            lcd.setCursor(0,1);
+            lcd.print("Trolley Ready");
+            
+            successBeep(); delay(300); successBeep();
+            delay(2000);
+            showHome();
+          }
+        }
+      }
+    }
+
+    // Check Firebase for new WiFi credentials every 10 seconds
+    if (millis() - lastWiFiCheck > 10000) {
+      lastWiFiCheck = millis();
+      if (Firebase.ready() && signupOK) {
+        if (Firebase.RTDB.getString(&fbdo, "/TROLLEY-1/wifi/ssid")) {
+          String newSSID = fbdo.stringData();
+          if (Firebase.RTDB.getString(&fbdo, "/TROLLEY-1/wifi/password")) {
+            String newPass = fbdo.stringData();
+            
+            if (newSSID != "" && newSSID != "null" && (newSSID != currentSSID || newPass != currentPassword)) {
+              Serial.println("New WiFi credentials found in Firebase!");
+              preferences.putString("ssid", newSSID);
+              preferences.putString("password", newPass);
+              
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("WiFi Updated!");
+              lcd.setCursor(0,1);
+              lcd.print("Restarting...");
+              delay(2000);
+              ESP.restart();
+            }
+          }
+        }
+      }
+    }
     return;
+  }
   if (!rfid.PICC_ReadCardSerial())
     return;
 
