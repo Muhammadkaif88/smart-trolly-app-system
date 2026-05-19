@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "486202489831",
+    "project_id": "smart-trolley-d480f",
+    "storage_bucket": "smart-trolley-d480f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:486202489831:android:dc7a36935503e9d2405b42",
+        "android_client_info": {
+          "package_name": "com.example.smart_trolley"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBH1GKg1H-ZSrVuU4FTPlyloCG_6d_MKWE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
