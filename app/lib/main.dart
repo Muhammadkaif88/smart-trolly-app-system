@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'staff_dashboard.dart';
+import 'settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -152,6 +153,17 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
+          ),
+        ],
       ),
 
       body: Padding(
@@ -703,13 +715,24 @@ class _QRCodePaymentPageState extends State<QRCodePaymentPage> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      // Send reset flag to ESP32 and clear app data
+                      final dbRef = FirebaseDatabase.instance.ref('TROLLEY-1');
+                      await dbRef.child('reset').set(true);
+                      await dbRef.child('items').remove();
+                      await dbRef.child('subtotal').set(0);
+                      await dbRef.child('gst').set(0);
+                      await dbRef.child('grandTotal').set(0);
+
                       setState(() {
                         isPaymentComplete = true;
                       });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Payment Successful!')),
-                      );
+                      
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Payment Successful! Trolley reset for next customer.')),
+                        );
+                      }
                     },
                     child: Text(
                       'PAYMENT DONE',
